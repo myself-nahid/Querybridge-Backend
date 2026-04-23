@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.database import get_db
-from app.schemas.auth import UserSignUp, UserLogin, ForgotPassword, VerifyOTP, ResetPassword, UserLoginData, VerifyOTPData, RefreshTokenRequest
+from app.schemas.auth import UserSignUp, UserLogin, ForgotPassword, UserSignUpResponse, VerifyOTP, ResetPassword, UserLoginData, VerifyOTPData, RefreshTokenRequest
 from app.schemas.response import StandardResponse
 from app.services import auth_service
 from app.models.user import User
@@ -11,7 +11,7 @@ from jose import jwt
 
 router = APIRouter()
 
-@router.post("/signup", response_model=StandardResponse[None])
+@router.post("/signup", response_model=StandardResponse[UserSignUpResponse])
 def signup(data: UserSignUp, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -24,8 +24,13 @@ def signup(data: UserSignUp, db: Session = Depends(get_db)):
     )
     db.add(new_user)
     db.commit()
-    return StandardResponse(success=True, message="Signup successful. Please wait for Admin approval.")
-
+    db.refresh(new_user) 
+    
+    return StandardResponse(
+        success=True, 
+        message="Signup successful. Please wait for Admin approval.", 
+        data=new_user 
+    )
 
 @router.post("/login", response_model=StandardResponse[UserLoginData])
 def login(data: UserLogin, db: Session = Depends(get_db)):

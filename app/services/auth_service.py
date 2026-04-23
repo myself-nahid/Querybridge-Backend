@@ -3,7 +3,7 @@ from fastapi import HTTPException, status
 from app.models.user import User, UserStatus
 from app.models.otp import OTPCode
 from app.core.security import verify_password, get_password_hash, create_access_token
-from jose import jwt
+from jose import JWTError, jwt
 from app.core.config import settings
 from app.services.email_service import send_otp_email
 from datetime import datetime, timedelta
@@ -84,3 +84,20 @@ def reset_user_password(db: Session, email: str, new_password: str):
         
     user.password_hash = get_password_hash(new_password)
     db.commit()
+
+def generate_tokens(user: User):
+    """Generates both access and refresh tokens after successful login."""
+    access_token = create_access_token(data={"sub": user.email, "role": user.role.value})
+    refresh_token = create_refresh_token(data={"sub": user.email, "role": user.role.value})
+    return access_token, refresh_token
+
+def verify_refresh_token(token: str):
+    """Decodes and validates the refresh token."""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        # Ensure they are actually using a refresh token, not an access token
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+        return payload
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
