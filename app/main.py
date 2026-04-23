@@ -4,7 +4,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.database import engine, Base
-from app.api.v1 import auth, users
+from app.api.v1 import auth, users, admin
 
 # Create Database Tables
 Base.metadata.create_all(bind=engine)
@@ -58,6 +58,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 # ROUTERS
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["User Management"])
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin Dashboard"])
 
 @app.get("/")
 def root():
