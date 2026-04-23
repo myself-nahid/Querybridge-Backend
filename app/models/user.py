@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Enum
+from sqlalchemy import Column, DateTime, Integer, String, Enum
+from datetime import datetime
 from app.db.database import Base
 import enum
 
@@ -21,3 +22,4 @@ class User(Base):
     password_hash = Column(String)
     role = Column(Enum(UserRole), default=UserRole.SALES_MANAGER)
     status = Column(Enum(UserStatus), default=UserStatus.PENDING)
+    created_at = Column(DateTime, default=datetime.utcnow)
