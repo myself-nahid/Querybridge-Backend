@@ -3,9 +3,29 @@ from fastapi import HTTPException, status
 from app.models.user import User, UserStatus
 from app.models.otp import OTPCode
 from app.core.security import verify_password, get_password_hash, create_access_token
+from jose import jwt
+from app.core.config import settings
 from app.services.email_service import send_otp_email
 from datetime import datetime, timedelta
 import random
+
+def create_refresh_token(data: dict, expires_delta: timedelta = None) -> str:
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(days=7)  # Default 7 days
+    to_encode.update({"exp": expire, "type": "refresh"})
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+def verify_refresh_token(token: str):
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise ValueError()
+        return payload
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
 def authenticate_user(db: Session, email: str, password: str):
     user = db.query(User).filter(User.email == email).first()
@@ -18,6 +38,11 @@ def authenticate_user(db: Session, email: str, password: str):
         raise HTTPException(status_code=403, detail="Account rejected")
         
     return user
+
+def generate_tokens(user):
+    access_token = create_access_token(data={"sub": user.email, "role": user.role.value})
+    refresh_token = create_refresh_token(data={"sub": user.email, "role": user.role.value})
+    return access_token, refresh_token
 
 def generate_forgot_password_otp(db: Session, email: str):
     user = db.query(User).filter(User.email == email).first()

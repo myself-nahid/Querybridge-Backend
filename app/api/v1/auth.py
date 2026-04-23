@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.database import get_db
-from app.schemas.auth import UserSignUp, UserLogin, ForgotPassword, VerifyOTP, ResetPassword, UserLoginData, VerifyOTPData
+from app.schemas.auth import UserSignUp, UserLogin, ForgotPassword, VerifyOTP, ResetPassword, UserLoginData, VerifyOTPData, RefreshTokenRequest
 from app.schemas.response import StandardResponse
 from app.services import auth_service
 from app.models.user import User
@@ -26,16 +26,32 @@ def signup(data: UserSignUp, db: Session = Depends(get_db)):
     db.commit()
     return StandardResponse(success=True, message="Signup successful. Please wait for Admin approval.")
 
+
 @router.post("/login", response_model=StandardResponse[UserLoginData])
 def login(data: UserLogin, db: Session = Depends(get_db)):
     user = auth_service.authenticate_user(db, data.email, data.password)
-    access_token = create_access_token(data={"sub": user.email, "role": user.role.value})
-    
+    access_token, refresh_token = auth_service.generate_tokens(user)
     response_data = UserLoginData(
         access_token=access_token,
+        refresh_token=refresh_token,
         user={"name": user.name, "email": user.email, "role": user.role.value}
     )
     return StandardResponse(success=True, message="Login successful.", data=response_data)
+
+
+@router.post("/refresh-token", response_model=StandardResponse[UserLoginData])
+def refresh_token(data: RefreshTokenRequest):
+    payload = auth_service.verify_refresh_token(data.refresh_token)
+    # Optionally, you can check user existence/status here
+    access_token = create_access_token(data={"sub": payload["sub"], "role": payload["role"]})
+    refresh_token = data.refresh_token  # Optionally, issue a new refresh token
+    user = {"email": payload["sub"], "role": payload["role"]}
+    response_data = UserLoginData(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=user
+    )
+    return StandardResponse(success=True, message="Token refreshed successfully.", data=response_data)
 
 @router.post("/forgot-password", response_model=StandardResponse[None])
 def forgot_password(data: ForgotPassword, db: Session = Depends(get_db)):
