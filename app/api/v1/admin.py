@@ -49,7 +49,7 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
 # 2. USER MANAGEMENT (CRUD)
 @router.get("/users", response_model=StandardResponse[List[UserOut]])
 def get_all_users(db: Session = Depends(get_db)):
-    users = db.query(User).order_by(User.id.desc()).all()
+    users = db.query(User).filter(User.role != "Admin").order_by(User.id.desc()).all()
     return StandardResponse(success=True, message="Users fetched successfully", data=users)
 
 @router.post("/users", response_model=StandardResponse[UserOut])
