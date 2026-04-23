@@ -1,0 +1,23 @@
+from sqlalchemy import Column, Integer, String, Enum
+from app.db.database import Base
+import enum
+
+class UserStatus(str, enum.Enum):
+    PENDING = "Pending"
+    ACTIVE = "Active"
+    REJECTED = "Rejected"
+
+class UserRole(str, enum.Enum):
+    ADMIN = "Admin"
+    SALES_MANAGER = "Sales Manager"
+    SECRETARY = "Secretary"
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    email = Column(String, unique=True, index=True)
+    password_hash = Column(String)
+    role = Column(Enum(UserRole), default=UserRole.SALES_MANAGER)
+    status = Column(Enum(UserStatus), default=UserStatus.PENDING)
