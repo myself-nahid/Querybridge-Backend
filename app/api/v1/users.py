@@ -38,12 +38,12 @@ def update_web_user_profile(
     current_user: User = Depends(get_current_user)
 ):
     """WEB USER: Updates Name and Email only."""
-    if data.email != current_user.email:
-        if db.query(User).filter(User.email == data.email).first():
-            raise HTTPException(status_code=400, detail="Email already in use.")
+    # if data.email != current_user.email:
+    #     if db.query(User).filter(User.email == data.email).first():
+    #         raise HTTPException(status_code=400, detail="Email already in use.")
 
     current_user.name = data.name
-    current_user.email = data.email
+    # current_user.email = data.email
     db.commit()
     db.refresh(current_user)
 

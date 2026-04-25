@@ -20,7 +20,7 @@ class UserOut(BaseModel):
 # WEB USER SETTINGS SCHEMA 
 class WebUserUpdateProfile(BaseModel):
     name: str
-    email: EmailStr
+    # email: EmailStr
 
 # ADMIN SETTINGS SCHEMA 
 class AdminUpdateProfile(BaseModel):
