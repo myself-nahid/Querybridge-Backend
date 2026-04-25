@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.database import engine, Base
-from app.api.v1 import auth, users, admin
+from app.api.v1 import auth, chat, users, admin
 
 # Create Database Tables
 Base.metadata.create_all(bind=engine)
@@ -63,6 +63,7 @@ app.mount("/api/v1/avatars", StaticFiles(directory="uploads/avatars"), name="ava
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["User Management"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin Dashboard"])
+app.include_router(chat.router, prefix="/api/v1/chat", tags=["AI Chat Portal"])
 
 @app.get("/")
 def root():
