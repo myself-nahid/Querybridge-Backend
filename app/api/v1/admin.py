@@ -7,10 +7,11 @@ from app.db.database import get_db
 from app.models.user import User, UserStatus
 from app.schemas.response import StandardResponse
 from app.schemas.user import UserOut
-from app.schemas.admin import DashboardStatsData, YearlyGrowth, UserCreateByAdmin, UserUpdate
+from app.schemas.admin import DashboardStatsData, PaginatedNotifications, YearlyGrowth, UserCreateByAdmin, UserUpdate
 from app.core.dependencies import get_current_admin
 from app.core.security import get_password_hash
 from datetime import datetime
+import math
 
 # Enforce Admin access on ALL routes in this router
 router = APIRouter(dependencies=[Depends(get_current_admin)])
@@ -97,7 +98,46 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     db.commit()
     return StandardResponse(success=True, message="User deleted successfully")
 
-# 3. NOTIFICATIONS (APPROVAL/REJECTION)
+# 3. NOTIFICATIONS 
+@router.get("/notifications", response_model=StandardResponse[PaginatedNotifications])
+def get_notifications(page: int = 1, limit: int = 5, db: Session = Depends(get_db)):
+    """
+    Fetches all PENDING users for the Notifications page, with pagination.
+    """
+    # 1. Calculate offset
+    skip = (page - 1) * limit
+
+    # 2. Get total count for pagination math
+    total_pending = db.query(User).filter(User.status == UserStatus.PENDING).count()
+
+    # 3. Fetch the pending users ordered by newest first
+    pending_users = (
+        db.query(User)
+        .filter(User.status == UserStatus.PENDING)
+        .order_by(User.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+    # 4. Format the paginated response
+    total_pages = math.ceil(total_pending / limit) if total_pending > 0 else 1
+
+    data = PaginatedNotifications(
+        total_requests=total_pending,
+        current_page=page,
+        total_pages=total_pages,
+        limit=limit,
+        requests=pending_users
+    )
+
+    return StandardResponse(
+        success=True, 
+        message="Notifications fetched successfully.", 
+        data=data
+    )
+
+# NOTIFICATIONS (APPROVAL/REJECTION)
 @router.post("/users/{user_id}/approve", response_model=StandardResponse[None])
 def approve_user(user_id: int, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()

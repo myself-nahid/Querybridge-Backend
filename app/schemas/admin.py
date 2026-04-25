@@ -27,3 +27,10 @@ class UserUpdate(BaseModel):
     name: str
     email: EmailStr
     role: UserRole
+
+class PaginatedNotifications(BaseModel):
+    total_requests: int
+    current_page: int
+    total_pages: int
+    limit: int
+    requests: List[UserOut]
