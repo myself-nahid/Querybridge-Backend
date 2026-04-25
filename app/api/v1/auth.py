@@ -81,3 +81,8 @@ def reset_password(data: ResetPassword, db: Session = Depends(get_db)):
 
     auth_service.reset_user_password(db, email, data.new_password)
     return StandardResponse(success=True, message="Password updated successfully.")
+
+# logout endpoint
+@router.post("/logout", response_model=StandardResponse[None])
+def logout():
+    return StandardResponse(success=True, message="Logout successful.")
