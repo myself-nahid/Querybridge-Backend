@@ -3,13 +3,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List
 
+from app.core.dependencies import get_current_admin
+from app.core.dependencies import get_current_admin
 from app.db.database import get_db
 from app.models.user import User, UserStatus
 from app.schemas.response import StandardResponse
 from app.schemas.user import UserOut
 from app.schemas.admin import DashboardStatsData, PaginatedNotifications, YearlyGrowth, UserCreateByAdmin, UserUpdate
-from app.core.dependencies import get_current_admin
-from app.core.security import get_password_hash
+from app.schemas.user import AdminUpdateProfile, UpdatePassword
+from app.core.security import verify_password, get_password_hash
 from datetime import datetime
 import math
 
@@ -157,3 +159,40 @@ def reject_user(user_id: int, db: Session = Depends(get_db)):
     user.status = UserStatus.REJECTED
     db.commit()
     return StandardResponse(success=True, message=f"User {user.email} rejected.")
+
+# 4. ADMIN PROFILE SETTINGS
+@router.put("/me", response_model=StandardResponse[UserOut])
+def update_admin_profile(
+    data: AdminUpdateProfile, 
+    db: Session = Depends(get_db), 
+    current_admin: User = Depends(get_current_admin)
+):
+    """ADMIN ONLY: Updates Name, Email, Phone, and Address."""
+    if data.email != current_admin.email:
+        if db.query(User).filter(User.email == data.email).first():
+            raise HTTPException(status_code=400, detail="Email already in use.")
+
+    current_admin.name = data.name
+    current_admin.email = data.email
+    current_admin.phone = data.phone
+    current_admin.address = data.address
+
+    db.commit()
+    db.refresh(current_admin)
+
+    return StandardResponse(success=True, message="Admin profile updated.", data=current_admin)
+
+@router.put("/me/password", response_model=StandardResponse[None])
+def update_admin_password(
+    data: UpdatePassword, 
+    db: Session = Depends(get_db), 
+    current_admin: User = Depends(get_current_admin)
+):
+    """ADMIN ONLY: Updates Password."""
+    if not verify_password(data.current_password, current_admin.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect.")
+
+    current_admin.password_hash = get_password_hash(data.new_password)
+    db.commit()
+
+    return StandardResponse(success=True, message="Admin password updated successfully.")

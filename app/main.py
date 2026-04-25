@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.database import engine, Base
@@ -54,6 +55,9 @@ async def general_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={"success": False, "message": "Internal Server Error", "data": str(exc)}
     )
+
+# STATIC FILES (for user avatars)
+app.mount("/api/v1/avatars", StaticFiles(directory="uploads/avatars"), name="avatars")
 
 # ROUTERS
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
