@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from typing import List
 
 from app.core.dependencies import get_current_admin
@@ -78,24 +78,49 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     return StandardResponse(success=True, message="Stats fetched successfully", data=data)
 
 # 2. USER MANAGEMENT (CRUD)
-@router.get("/users", response_model=StandardResponse[PaginatedUsers]) 
+@router.get("/users", response_model=StandardResponse[PaginatedUsers])
 def get_all_users(
-    page: int = 1, 
-    limit: int = 10, 
+    page: int = 1,
+    limit: int = 10,
+    search: str | None = None,
+    status: str = "all",   # all | active | pending
     db: Session = Depends(get_db)
 ):
     """
-    Fetches all non-Admin users for the User Management table, with pagination.
+    Fetch users with pagination + search + status filter
     """
-    # 1. Calculate the offset for the query
+
     skip = (page - 1) * limit
 
-    # 2. Get the total count of users to calculate total pages
-    # We filter out the 'Admin' role so admins can't accidentally edit/delete other admins
+    # Base query (exclude admins)
     query = db.query(User).filter(User.role != UserRole.ADMIN)
+
+    # ---------------------------
+    # Status filter
+    # ---------------------------
+    if status.lower() == "active":
+        query = query.filter(User.status == UserStatus.ACTIVE)
+    elif status.lower() == "pending":
+        query = query.filter(User.status == UserStatus.PENDING)
+    # "all" -> no filter applied
+
+    # ---------------------------
+    # Search filter (name/email/phone example)
+    # ---------------------------
+    if search:
+        search_filter = f"%{search}%"
+        query = query.filter(
+            or_(
+                User.name.ilike(search_filter),
+                User.email.ilike(search_filter),
+                User.phone.ilike(search_filter)
+            )
+        )
+
+    # Total count after filters
     total_users = query.count()
 
-    # 3. Fetch the users for the current page, newest first
+    # Paginated data
     users = (
         query
         .order_by(User.id.desc())
@@ -104,10 +129,8 @@ def get_all_users(
         .all()
     )
 
-    # 4. Calculate total pages
     total_pages = math.ceil(total_users / limit) if total_users > 0 else 1
 
-    # 5. Structure the response using the PaginatedUsers schema
     data = PaginatedUsers(
         total_users=total_users,
         current_page=page,
@@ -115,8 +138,12 @@ def get_all_users(
         limit=limit,
         users=users
     )
-    
-    return StandardResponse(success=True, message="Users fetched successfully", data=data)
+
+    return StandardResponse(
+        success=True,
+        message="Users fetched successfully",
+        data=data
+    )
 
 @router.post("/users", response_model=StandardResponse[UserOut])
 def add_user(data: UserCreateByAdmin, db: Session = Depends(get_db)):
