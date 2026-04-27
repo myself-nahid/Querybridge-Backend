@@ -82,12 +82,17 @@ async def ask_question(
     db.commit()
 
     # 3. RBAC Logic: Define which databases this user can access
-    # Based on Figma/PDF requirements: Sales Manager -> All, Secretary -> Specific DB
     allowed_dbs =[]
     if current_user.role in [UserRole.ADMIN, UserRole.SALES_MANAGER]:
-        allowed_dbs = ["Company_A", "Company_B", "Company_C"]
-    elif current_user.role == UserRole.SECRETARY:
-        allowed_dbs = ["Company_A"] # Restrict Secretaries to Company A only
+        allowed_dbs = ["Company_A", "Company_B", "Company_C", "SAMINC"]
+    elif current_user.role == UserRole.CEO:
+        allowed_dbs = ["Company_A", "Company_B", "Company_C", "SAMINC"] 
+    elif current_user.role == UserRole.CFO:
+        allowed_dbs = ["Company_A", "Company_B", "Company_C", "SAMINC"] 
+    elif current_user.role == UserRole.SALESPEOPLE: 
+        allowed_dbs = ["Company_A", "Company_C", "SAMINC"] 
+    elif current_user.role == UserRole.PRODUCTION_MANAGER: 
+        allowed_dbs = ["Company_A", "Company_B", "Company_C", "SAMINC"]
 
     # 4. Request the REAL AI Microservice
     ai_response_text = await ask_ai_microservice(
