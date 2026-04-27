@@ -22,6 +22,10 @@ async def ask_ai_microservice(
         "allowed_dbs": allowed_dbs,  
         "chat_history": chat_history
     }
+
+    print(">>> SENDING TO AI DEVELOPER:")
+    print(payload)
+    print("----------------------------")
     
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:

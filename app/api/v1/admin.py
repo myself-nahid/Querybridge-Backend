@@ -32,19 +32,46 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     ).group_by('year').order_by('year').all()
 
     # Format for the frontend chart (handling empty DB edge cases)
-    growth_data =[YearlyGrowth(year=str(int(yc.year)), count=yc.count) for yc in yearly_counts]
-    
+    growth_data = [YearlyGrowth(year=str(int(yc.year)), count=yc.count) for yc in yearly_counts]
+
+    # Calculate growth percentages (current year vs previous year)
+    def calc_growth(current, previous):
+        if previous == 0:
+            return 0.0 if current == 0 else 100.0
+        return round(((current - previous) / previous) * 100, 2)
+
+    current_year = datetime.utcnow().year
+    prev_year = current_year - 1
+
+    # Helper to get user counts by status for a given year
+    def get_count_for_year(year, status=None):
+        q = db.query(User).filter(func.extract('year', User.created_at) == year)
+        if status:
+            q = q.filter(User.status == status)
+        return q.count()
+
+    total_this_year = get_count_for_year(current_year)
+    total_last_year = get_count_for_year(prev_year)
+    approved_this_year = get_count_for_year(current_year, UserStatus.ACTIVE)
+    approved_last_year = get_count_for_year(prev_year, UserStatus.ACTIVE)
+    pending_this_year = get_count_for_year(current_year, UserStatus.PENDING)
+    pending_last_year = get_count_for_year(prev_year, UserStatus.PENDING)
+
+    total_users_growth = calc_growth(total_this_year, total_last_year)
+    approved_users_growth = calc_growth(approved_this_year, approved_last_year)
+    pending_users_growth = calc_growth(pending_this_year, pending_last_year)
+
     # Optional: If DB is empty/new, mock some data for the chart to match Figma
     if not growth_data:
-        current_year = datetime.utcnow().year
-        growth_data =[
-            YearlyGrowth(year=str(y), count=0) for y in range(current_year - 4, current_year + 1)
-        ]
+        growth_data = [YearlyGrowth(year=str(y), count=0) for y in range(current_year - 4, current_year + 1)]
 
     data = DashboardStatsData(
         total_users=total,
         approved_users=approved,
         pending_users=pending,
+        total_users_growth=total_users_growth,
+        approved_users_growth=approved_users_growth,
+        pending_users_growth=pending_users_growth,
         yearly_growth=growth_data
     )
     return StandardResponse(success=True, message="Stats fetched successfully", data=data)

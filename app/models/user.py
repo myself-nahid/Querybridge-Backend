@@ -11,7 +11,10 @@ class UserStatus(str, enum.Enum):
 class UserRole(str, enum.Enum):
     ADMIN = "Admin"
     SALES_MANAGER = "Sales Manager"
-    SECRETARY = "Secretary"
+    SALESPEOPLE = "Salespeople"
+    CEO = "CEO"
+    CFO = "CFO"
+    PRODUCTION_MANAGER = "Production Manager"
 
 class User(Base):
     __tablename__ = "users"

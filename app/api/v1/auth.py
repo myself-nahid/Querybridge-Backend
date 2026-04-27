@@ -68,6 +68,11 @@ def verify_otp(data: VerifyOTP, db: Session = Depends(get_db)):
     reset_token = auth_service.verify_otp_and_get_token(db, data.email, data.otp_code)
     return StandardResponse(success=True, message="OTP verified successfully.", data=VerifyOTPData(reset_token=reset_token))
 
+@router.post("/resend-otp", response_model=StandardResponse[None])
+def resend_otp(data: ForgotPassword, db: Session = Depends(get_db)):
+    auth_service.generate_forgot_password_otp(db, data.email)
+    return StandardResponse(success=True, message="If the email is registered, a new OTP has been sent.")
+
 @router.post("/reset-password", response_model=StandardResponse[None])
 def reset_password(data: ResetPassword, db: Session = Depends(get_db)):
     try:

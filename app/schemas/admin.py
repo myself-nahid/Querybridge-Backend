@@ -12,6 +12,9 @@ class DashboardStatsData(BaseModel):
     total_users: int
     approved_users: int
     pending_users: int
+    total_users_growth: float
+    approved_users_growth: float
+    pending_users_growth: float
     yearly_growth: List[YearlyGrowth]
 
 # User Management Schemas 
