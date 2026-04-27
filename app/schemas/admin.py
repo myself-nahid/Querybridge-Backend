@@ -37,3 +37,10 @@ class PaginatedNotifications(BaseModel):
     total_pages: int
     limit: int
     requests: List[UserOut]
+
+class PaginatedUsers(BaseModel):
+    total_users: int
+    current_page: int
+    total_pages: int
+    limit: int
+    users: List[UserOut]

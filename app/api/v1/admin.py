@@ -6,13 +6,14 @@ from typing import List
 from app.core.dependencies import get_current_admin
 from app.core.dependencies import get_current_admin
 from app.db.database import get_db
-from app.models.user import User, UserStatus
+from app.models.user import User, UserRole, UserStatus
 from app.schemas.response import StandardResponse
 from app.schemas.user import UserOut
 from app.schemas.admin import DashboardStatsData, PaginatedNotifications, YearlyGrowth, UserCreateByAdmin, UserUpdate
 from app.schemas.user import AdminUpdateProfile, UpdatePassword
 from app.core.security import verify_password, get_password_hash
 from datetime import datetime
+from app.schemas.admin import PaginatedUsers
 import math
 
 # Enforce Admin access on ALL routes in this router
@@ -77,10 +78,45 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     return StandardResponse(success=True, message="Stats fetched successfully", data=data)
 
 # 2. USER MANAGEMENT (CRUD)
-@router.get("/users", response_model=StandardResponse[List[UserOut]])
-def get_all_users(db: Session = Depends(get_db)):
-    users = db.query(User).filter(User.role != "Admin").order_by(User.id.desc()).all()
-    return StandardResponse(success=True, message="Users fetched successfully", data=users)
+@router.get("/users", response_model=StandardResponse[PaginatedUsers]) 
+def get_all_users(
+    page: int = 1, 
+    limit: int = 10, 
+    db: Session = Depends(get_db)
+):
+    """
+    Fetches all non-Admin users for the User Management table, with pagination.
+    """
+    # 1. Calculate the offset for the query
+    skip = (page - 1) * limit
+
+    # 2. Get the total count of users to calculate total pages
+    # We filter out the 'Admin' role so admins can't accidentally edit/delete other admins
+    query = db.query(User).filter(User.role != UserRole.ADMIN)
+    total_users = query.count()
+
+    # 3. Fetch the users for the current page, newest first
+    users = (
+        query
+        .order_by(User.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+    # 4. Calculate total pages
+    total_pages = math.ceil(total_users / limit) if total_users > 0 else 1
+
+    # 5. Structure the response using the PaginatedUsers schema
+    data = PaginatedUsers(
+        total_users=total_users,
+        current_page=page,
+        total_pages=total_pages,
+        limit=limit,
+        users=users
+    )
+    
+    return StandardResponse(success=True, message="Users fetched successfully", data=data)
 
 @router.post("/users", response_model=StandardResponse[UserOut])
 def add_user(data: UserCreateByAdmin, db: Session = Depends(get_db)):
