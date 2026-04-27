@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import List
 from app.models.user import UserRole, UserStatus
 from app.schemas.user import UserOut
@@ -26,10 +26,36 @@ class UserCreateByAdmin(BaseModel):
     # We will generate a default one or leave it to a "Welcome Email" flow.
     password: str = "changeme123" 
 
+    @field_validator("role", mode="before")
+    def parse_role(cls, role):
+        if isinstance(role, UserRole):
+            return role
+        if isinstance(role, str):
+            try:
+                return UserRole[role]
+            except KeyError:
+                for item in UserRole:
+                    if item.value.lower() == role.lower():
+                        return item
+        raise ValueError(f"Invalid role: {role}")
+
 class UserUpdate(BaseModel):
     name: str
     email: EmailStr
     role: UserRole
+
+    @field_validator("role", mode="before")
+    def parse_role(cls, role):
+        if isinstance(role, UserRole):
+            return role
+        if isinstance(role, str):
+            try:
+                return UserRole[role]
+            except KeyError:
+                for item in UserRole:
+                    if item.value.lower() == role.lower():
+                        return item
+        raise ValueError(f"Invalid role: {role}")
 
 class PaginatedNotifications(BaseModel):
     total_requests: int

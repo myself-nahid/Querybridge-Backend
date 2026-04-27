@@ -4,7 +4,6 @@ from sqlalchemy import func, or_
 from typing import List
 
 from app.core.dependencies import get_current_admin
-from app.core.dependencies import get_current_admin
 from app.db.database import get_db
 from app.models.user import User, UserRole, UserStatus
 from app.schemas.response import StandardResponse
@@ -18,6 +17,20 @@ import math
 
 # Enforce Admin access on ALL routes in this router
 router = APIRouter(dependencies=[Depends(get_current_admin)])
+
+
+def normalize_user_role(role_input):
+    if isinstance(role_input, UserRole):
+        return role_input
+    if isinstance(role_input, str):
+        try:
+            return UserRole[role_input]
+        except KeyError:
+            pass
+        for role in UserRole:
+            if role.value.lower() == role_input.lower():
+                return role
+    raise HTTPException(status_code=400, detail=f"Invalid role: {role_input}")
 
 # 1. DASHBOARD STATS
 @router.get("/dashboard-stats", response_model=StandardResponse[DashboardStatsData])
@@ -154,7 +167,7 @@ def add_user(data: UserCreateByAdmin, db: Session = Depends(get_db)):
     new_user = User(
         name=data.name,
         email=data.email,
-        role=data.role,
+        role=normalize_user_role(data.role),
         password_hash=get_password_hash(data.password),
         status=UserStatus.ACTIVE 
     )
@@ -175,7 +188,7 @@ def update_user(user_id: int, data: UserUpdate, db: Session = Depends(get_db)):
 
     user.name = data.name
     user.email = data.email
-    user.role = data.role
+    user.role = normalize_user_role(data.role)
     db.commit()
     db.refresh(user)
     return StandardResponse(success=True, message="User updated successfully", data=user)

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from app.models.user import UserRole
 from typing import Optional
 
@@ -7,6 +7,19 @@ class UserSignUp(BaseModel):
     email: EmailStr
     password: str
     role: UserRole
+
+    @field_validator("role", mode="before")
+    def parse_role(cls, role):
+        if isinstance(role, UserRole):
+            return role
+        if isinstance(role, str):
+            try:
+                return UserRole[role]
+            except KeyError:
+                for item in UserRole:
+                    if item.value.lower() == role.lower():
+                        return item
+        raise ValueError(f"Invalid role: {role}")
 
 class UserLogin(BaseModel):
     email: EmailStr
