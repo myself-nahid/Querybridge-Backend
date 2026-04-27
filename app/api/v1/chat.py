@@ -9,6 +9,7 @@ from app.schemas.response import StandardResponse
 from app.schemas.chat import ChatSessionOut, ChatMessageOut, AskQuestionRequest, AskQuestionResponse
 from app.core.dependencies import get_current_user
 from app.microservices.ai_client import ask_ai_microservice
+from app.models.user import UserRole
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -54,10 +55,11 @@ async def ask_question(
 ):
     """Sends question to AI, saves DB history, and manages sessions."""
     
-    # 1. Manage the Session ID
     session_id = data.session_id
+    chat_history_formatted =[]
+
+    # 1. Manage Session & Fetch History
     if not session_id:
-        # Create a new session with a generated title (first 35 chars of question)
         title = data.question[:35] + "..." if len(data.question) > 35 else data.question
         new_session = ChatSession(user_id=current_user.id, title=title)
         db.add(new_session)
@@ -65,28 +67,42 @@ async def ask_question(
         db.refresh(new_session)
         session_id = new_session.id
     else:
-        # Verify existing session belongs to user
         session = db.query(ChatSession).filter(ChatSession.id == session_id, ChatSession.user_id == current_user.id).first()
         if not session:
             raise HTTPException(status_code=404, detail="Chat session not found.")
+            
+        # Fetch previous messages so the AI Remembers the context!
+        past_messages = db.query(ChatMessage).filter(ChatMessage.session_id == session_id).order_by(ChatMessage.created_at.asc()).all()
+        for msg in past_messages:
+            chat_history_formatted.append({"sender": msg.sender, "message": msg.message_text})
 
-    # 2. Save the User's Message to DB
+    # 2. Save the NEW User Message to DB
     user_msg = ChatMessage(session_id=session_id, sender="user", message_text=data.question)
     db.add(user_msg)
     db.commit()
 
-    # 3. Request the AI Microservice (Passing user role for SAGE 300 ERP filtering context)
+    # 3. RBAC Logic: Define which databases this user can access
+    # Based on Figma/PDF requirements: Sales Manager -> All, Secretary -> Specific DB
+    allowed_dbs =[]
+    if current_user.role in [UserRole.ADMIN, UserRole.SALES_MANAGER]:
+        allowed_dbs = ["Company_A", "Company_B", "Company_C"]
+    elif current_user.role == UserRole.SECRETARY:
+        allowed_dbs = ["Company_A"] # Restrict Secretaries to Company A only
+
+    # 4. Request the REAL AI Microservice
     ai_response_text = await ask_ai_microservice(
-        question=data.question, 
-        user_role=current_user.role.value, 
-        user_email=current_user.email
+        question=data.question,
+        user_id=current_user.id,
+        user_role=current_user.role.value,
+        allowed_dbs=allowed_dbs,
+        chat_history=chat_history_formatted
     )
 
-    # 4. Save the AI's Response to DB
+    # 5. Save the AI's Response to DB
     ai_msg = ChatMessage(session_id=session_id, sender="ai", message_text=ai_response_text)
     db.add(ai_msg)
     db.commit()
 
-    # 5. Return data to frontend
+    # 6. Return data to frontend
     response_data = AskQuestionResponse(session_id=session_id, answer=ai_response_text)
     return StandardResponse(success=True, message="AI replied.", data=response_data)

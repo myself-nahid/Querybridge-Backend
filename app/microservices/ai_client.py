@@ -1,36 +1,50 @@
 import httpx
-from typing import List
+from typing import List, Dict
+from app.core.config import settings
 
-# In production, this would be the URL of the AI Team's Django microservice
-# e.g., AI_SERVICE_URL = "http://ai-engine-service:8001/generate-sql-response"
-AI_SERVICE_URL = "http://localhost:8001/api/ai/ask"
-
-async def ask_ai_microservice(question: str, user_role: str, user_email: str) -> str:
+async def ask_ai_microservice(
+    question: str, 
+    user_id: int, 
+    user_role: str, 
+    allowed_dbs: List[str], 
+    chat_history: List[Dict[str, str]]
+) -> str:
     """
-    Sends the user's question and RBAC context to the AI microservice.
+    Sends the real request to the AI Microservice, including history and RBAC context.
     """
+    
+    # CRITICAL FIX: The AI Developer expects a "flat" JSON structure, 
+    # not nested inside a 'user_context' object!
     payload = {
         "query": question,
-        "context": {
-            "role": user_role,
-            "email": user_email
-        }
+        "user_id": str(user_id),          
+        "role": user_role,           
+        "allowed_dbs": allowed_dbs,  
+        "chat_history": chat_history
     }
     
     try:
-        # async httpx call to the AI engine
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            # Uncomment the below line when the AI team's service is live
-            # response = await client.post(AI_SERVICE_URL, json=payload)
-            # response.raise_for_status()
-            # return response.json().get("answer", "I could not generate an answer.")
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(settings.AI_MICROSERVICE_URL, json=payload)
+            response.raise_for_status()
             
-            # --- MOCK RESPONSE FOR NOW (Until AI team finishes their part) ---
-            import asyncio
-            await asyncio.sleep(1) # Simulate AI thinking time
-            return f"Mock AI Response: Based on your role as {user_role}, the SQL results for '{question}' show a total of $45,000."
+            data = response.json()
             
+            # ADD THIS PRINT STATEMENT
+            print(f"========== RAW AI RESPONSE ==========")
+            print(data)
+            print(f"=====================================")
+            
+            # For now, keep this the same
+            return data.get("response", "I could not generate an answer at this time.")
+            
+    except httpx.ConnectError:
+        return "System Error: The AI Microservice is currently offline or unreachable."
+    except httpx.TimeoutException:
+        return "System Error: The AI Microservice took too long to respond. Please try a simpler query."
+    except httpx.HTTPStatusError as e:
+        print(f"AI Service HTTP Error: {e.response.status_code} - {e.response.text}")
+        return "System Error: The AI Microservice encountered an internal error while processing your request."
     except Exception as e:
-        # Fallback error handling if AI service is down
-        print(f"AI Service Error: {str(e)}")
-        return "I am currently unable to reach the AI engine. Please try again later."
+        print(f"Unexpected AI Service Error: {str(e)}")
+        return "System Error: An unexpected error occurred communicating with the AI engine."
