@@ -197,10 +197,13 @@ async def reject_user(user_id: int, db: AsyncSession = Depends(get_db)):
 # ==========================================
 @router.put("/me", response_model=StandardResponse[UserOut])
 async def update_admin_profile(data: AdminUpdateProfile, db: AsyncSession = Depends(get_db), current_admin: User = Depends(get_current_admin)):
-    if data.email != current_admin.email and (await db.execute(select(User).where(User.email == data.email))).scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Email already in use.")
-
-    current_admin.name, current_admin.email, current_admin.phone, current_admin.address = data.name, data.email, data.phone, data.address
+    current_admin.name = data.name
+    if data.email:
+        current_admin.email = data.email
+    if data.phone is not None:
+        current_admin.phone = data.phone
+    if data.address is not None:
+        current_admin.address = data.address
     await db.commit()
     await db.refresh(current_admin)
     return StandardResponse(success=True, message="Admin profile updated.", data=current_admin)

@@ -6,7 +6,7 @@ from app.core.config import settings
 class UserOut(BaseModel):
     id: int
     name: str
-    email: EmailStr
+    email: Optional[EmailStr] 
     phone: Optional[str] = None
     address: Optional[str] = None
     role: UserRole
@@ -25,7 +25,7 @@ class WebUserUpdateProfile(BaseModel):
 # ADMIN SETTINGS SCHEMA 
 class AdminUpdateProfile(BaseModel):
     name: str
-    email: EmailStr
+    email: Optional[EmailStr] = None
     phone: Optional[str] = None
     address: Optional[str] = None
 
