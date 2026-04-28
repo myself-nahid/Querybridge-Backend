@@ -127,15 +127,27 @@ async def add_user(data: UserCreateByAdmin, db: AsyncSession = Depends(get_db)):
 @router.put("/users/{user_id}", response_model=StandardResponse[UserOut])
 async def update_user(user_id: int, data: UserUpdate, db: AsyncSession = Depends(get_db)):
     user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
-    if not user: raise HTTPException(status_code=404, detail="User not found")
+    if not user: 
+        raise HTTPException(status_code=404, detail="User not found")
     
-    if data.email != user.email and (await db.execute(select(User).where(User.email == data.email))).scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Email already in use")
+    # 1. Update Email (if provided and different)
+    if data.email is not None and data.email != user.email:
+        if (await db.execute(select(User).where(User.email == data.email))).scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Email already in use")
+        user.email = data.email
 
-    user.name, user.email, user.role = data.name, data.email, normalize_user_role(data.role)
+    # 2. Update Name (if provided)
+    if data.name is not None:
+        user.name = data.name
+        
+    # 3. Update Role (if provided)
+    if data.role is not None:
+        user.role = normalize_user_role(data.role)
+
     await db.commit()
     await db.refresh(user)
-    return StandardResponse(success=True, message="User updated", data=user)
+    
+    return StandardResponse(success=True, message="User updated successfully", data=user)
 
 @router.delete("/users/{user_id}", response_model=StandardResponse[None])
 async def delete_user(user_id: int, db: AsyncSession = Depends(get_db)):

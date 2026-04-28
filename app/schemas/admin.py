@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, field_validator
-from typing import List
+from typing import List, Optional
 from app.models.user import UserRole, UserStatus
 from app.schemas.user import UserOut
 
@@ -40,12 +40,14 @@ class UserCreateByAdmin(BaseModel):
         raise ValueError(f"Invalid role: {role}")
 
 class UserUpdate(BaseModel):
-    name: str
-    email: EmailStr
-    role: UserRole
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    role: Optional[UserRole] = None
 
     @field_validator("role", mode="before")
     def parse_role(cls, role):
+        if role is None:  
+            return role
         if isinstance(role, UserRole):
             return role
         if isinstance(role, str):
