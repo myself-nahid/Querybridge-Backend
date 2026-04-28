@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.db.database import get_db
 from app.schemas.auth import UserSignUp, UserLogin, ForgotPassword, UserSignUpResponse, VerifyOTP, ResetPassword, UserLoginData, VerifyOTPData, RefreshTokenRequest
 from app.schemas.response import StandardResponse
@@ -12,8 +13,9 @@ from jose import jwt
 router = APIRouter()
 
 @router.post("/signup", response_model=StandardResponse[UserSignUpResponse])
-def signup(data: UserSignUp, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.email == data.email).first():
+async def signup(data: UserSignUp, db: AsyncSession = Depends(get_db)):
+    existing_user = await db.execute(select(User).where(User.email == data.email))
+    if existing_user.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
         
     new_user = User(
@@ -23,18 +25,14 @@ def signup(data: UserSignUp, db: Session = Depends(get_db)):
         role=data.role
     )
     db.add(new_user)
-    db.commit()
-    db.refresh(new_user) 
+    await db.commit()
+    await db.refresh(new_user) 
     
-    return StandardResponse(
-        success=True, 
-        message="Signup successful. Please wait for Admin approval.", 
-        data=new_user 
-    )
+    return StandardResponse(success=True, message="Signup successful. Please wait for Admin approval.", data=new_user)
 
 @router.post("/login", response_model=StandardResponse[UserLoginData])
-def login(data: UserLogin, db: Session = Depends(get_db)):
-    user = auth_service.authenticate_user(db, data.email, data.password)
+async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
+    user = await auth_service.authenticate_user(db, data.email, data.password)
     access_token, refresh_token = auth_service.generate_tokens(user)
     response_data = UserLoginData(
         access_token=access_token,
@@ -43,51 +41,42 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
     )
     return StandardResponse(success=True, message="Login successful.", data=response_data)
 
-
 @router.post("/refresh-token", response_model=StandardResponse[UserLoginData])
-def refresh_token(data: RefreshTokenRequest):
+async def refresh_token(data: RefreshTokenRequest):
     payload = auth_service.verify_refresh_token(data.refresh_token)
-    # Optionally, you can check user existence/status here
     access_token = create_access_token(data={"sub": payload["sub"], "role": payload["role"]})
-    refresh_token = data.refresh_token  # Optionally, issue a new refresh token
     user = {"email": payload["sub"], "role": payload["role"]}
-    response_data = UserLoginData(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        user=user
-    )
+    response_data = UserLoginData(access_token=access_token, refresh_token=data.refresh_token, user=user)
     return StandardResponse(success=True, message="Token refreshed successfully.", data=response_data)
 
 @router.post("/forgot-password", response_model=StandardResponse[None])
-def forgot_password(data: ForgotPassword, db: Session = Depends(get_db)):
-    auth_service.generate_forgot_password_otp(db, data.email)
+async def forgot_password(data: ForgotPassword, db: AsyncSession = Depends(get_db)):
+    await auth_service.generate_forgot_password_otp(db, data.email)
     return StandardResponse(success=True, message="If the email is registered, an OTP has been sent.")
 
 @router.post("/verify-otp", response_model=StandardResponse[VerifyOTPData])
-def verify_otp(data: VerifyOTP, db: Session = Depends(get_db)):
-    reset_token = auth_service.verify_otp_and_get_token(db, data.email, data.otp_code)
+async def verify_otp(data: VerifyOTP, db: AsyncSession = Depends(get_db)):
+    reset_token = await auth_service.verify_otp_and_get_token(db, data.email, data.otp_code)
     return StandardResponse(success=True, message="OTP verified successfully.", data=VerifyOTPData(reset_token=reset_token))
 
 @router.post("/resend-otp", response_model=StandardResponse[None])
-def resend_otp(data: ForgotPassword, db: Session = Depends(get_db)):
-    auth_service.generate_forgot_password_otp(db, data.email)
+async def resend_otp(data: ForgotPassword, db: AsyncSession = Depends(get_db)):
+    await auth_service.generate_forgot_password_otp(db, data.email)
     return StandardResponse(success=True, message="If the email is registered, a new OTP has been sent.")
 
 @router.post("/reset-password", response_model=StandardResponse[None])
-def reset_password(data: ResetPassword, db: Session = Depends(get_db)):
+async def reset_password(data: ResetPassword, db: AsyncSession = Depends(get_db)):
     try:
         payload = jwt.decode(data.reset_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email = payload.get("sub")
-        token_type = payload.get("type")
-        if token_type != "reset":
+        if payload.get("type") != "reset":
             raise ValueError()
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
 
-    auth_service.reset_user_password(db, email, data.new_password)
+    await auth_service.reset_user_password(db, email, data.new_password)
     return StandardResponse(success=True, message="Password updated successfully.")
 
-# logout endpoint
 @router.post("/logout", response_model=StandardResponse[None])
-def logout():
+async def logout():
     return StandardResponse(success=True, message="Logout successful.")
