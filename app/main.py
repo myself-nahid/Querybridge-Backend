@@ -21,7 +21,7 @@ async def startup_event():
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-CORS = ["http://localhost:3000", "http://localhost:5173"]
+CORS = ["http://localhost:3000", "http://localhost:5173", "https://mellifluous-cajeta-149a58.netlify.app"]
 
 app.add_middleware(
     CORSMiddleware,
