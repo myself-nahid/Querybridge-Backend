@@ -27,7 +27,7 @@ async def startup_event():
         # but the DB is actually fine. We just log it and continue.
         print(f"Database initialization note: {e}")
 
-CORS = ["http://localhost:3000", "http://localhost:5173", "https://mellifluous-cajeta-149a58.netlify.app"]
+CORS = ["http://localhost:3000", "http://localhost:5173", "https://mellifluous-cajeta-149a58.netlify.app", "https://web.sqltest.cloud"]
 
 app.add_middleware(
     CORSMiddleware,
