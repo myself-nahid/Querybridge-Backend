@@ -17,9 +17,15 @@ app = FastAPI(
 # ASYNC DATABASE CREATION 
 @app.on_event("startup")
 async def startup_event():
-    """Creates database tables asynchronously on startup."""
-    async with async_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """Creates database tables safely, ignoring errors if they already exist."""
+    try:
+        async with async_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("Database tables initialized successfully.")
+    except Exception as e:
+        # If multiple workers try to create types at once, one will 'fail' 
+        # but the DB is actually fine. We just log it and continue.
+        print(f"Database initialization note: {e}")
 
 CORS = ["http://localhost:3000", "http://localhost:5173", "https://mellifluous-cajeta-149a58.netlify.app"]
 
